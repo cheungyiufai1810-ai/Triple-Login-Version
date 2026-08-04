@@ -1,0 +1,973 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
+<title>西鐵小巴 - 優化版</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚐</text></svg>">
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/ua-parser-js@1.0.37/dist/ua-parser.min.js"></script>
+<style>
+:root{--bg:#0f0f0f;--card:#1c1c1e;--gold:#fc0;--blue:#0a84ff;--red:#ff453a;--green:#30d158;--purple:#bf5af2;--orange:#ff9500;--radius:16}
+*{margin:0;padding:0;box-sizing:border;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
+body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
+/* 通用組件抽離，消除重複 */
+.header{padding:10px;text-align:center;border-bottom:1px solid #333;flex-shrink:0;position:relative}
+.title{font-size:32px;font-weight:800;color:var(--gold)}
+.dev-tag{font-size:16px;color:#aaa;cursor:pointer}
+.global-voice-toggle{position:absolute;top:8px;right:10px;width:52px;height:52px;border-radius:50%;background:var(--green);border:none;color:#fff;font-size:26px;cursor:pointer}
+.global-voice-toggle.muted{background:var(--red)}
+.view{display:none;flex:1;overflow-y:auto;padding:12px;flex-direction:column}
+.view.active{display:flex}
+.card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid #333}
+/* 統一按鈕樣式 */
+.btn{width:100%;padding:18px;border-radius:16px;font-size:24px;font-weight:700;border:none;cursor:pointer;color:#fff;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:10px}
+.btn:active{opacity:.8;transform:scale(.97)}
+.btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
+.btn-portal{background:linear-gradient(135deg,#0a84ff,#06c)}
+.btn-driver{background:linear-gradient(135deg,#ff453a,#c62828)}
+.btn-secondary{background:#3a3a3c}
+.btn-warn{background:#ff9f0a;color:#000}
+.btn-green{background:var(--green)}
+.btn-red{background:var(--red)}
+.btn-purple{background:var(--purple)}
+.btn-google{background:#fff;color:#000;border:1px solid #ddd}
+.btn-sm{width:auto;padding:10px 16px;font-size:16px}
+.row{display:flex;gap:12px;margin-bottom:10px}
+.row>*{flex:1}
+.badge{display:inline-block;padding:8px 20px;border-radius:20px;font-weight:700;font-size:18px;margin:4px}
+.badge-red{background:var(--red)}
+.badge-blue{background:var(--blue)}
+.badge-purple{background:var(--purple)}
+.big-number{font-size:56px;font-weight:800;text-align:center;margin:4px 0;color:var(--gold)}
+.station-name{font-size:32px;font-weight:700;text-align:center;margin:4px 0;color:var(--gold)}
+.msg-area{background:#1a1a1a;border-radius:14px;padding:12px;margin-top:8px}
+.msg-list{max-height:200px;overflow-y:auto;margin-bottom:8px;font-size:16px;display:flex;flex-direction:column;overflow-anchor:auto}
+.msg-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #333;flex-wrap:wrap}
+.msg-input{flex:1;padding:14px;border-radius:12px;border:none;font-size:18px;background:#2c2c2e;color:#fff;min-width:100px}
+.record-btn,.send-btn{width:56px;height:56px;border-radius:14px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;position:relative}
+.record-btn{background:#ff9f0a;color:#000;font-size:26}
+.record-btn.recording{background:red;color:#fff;animation:pulse .6s infinite}
+.send-btn{background:var(--blue);color:#fff;font-size:18px;font-weight:700}
+@keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.toast{position:fixed;top:20px;left:50%;transform:translateX(-50%);background:#333;color:#fff;padding:12px 28px;border-radius:30px;font-size:18px;z-index:999;opacity:0;transition:opacity .3s;pointer-events:none;max-width:90%}
+.toast.show{opacity:1}
+.login-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:50;display:none;flex-direction:column;align-items:center;justify-content:center;padding:20px}
+.login-modal.active{display:flex}
+.login-card{background:#1c1c1e;border:2px solid var(--gold);border-radius:20px;padding:24px;max-width:400px;width:100%;text-align:center}
+.login-card input{width:100%;padding:16px;margin:8px 0;border-radius:12px;border:none;font-size:20px;background:#2c2c2e;color:#fff}
+.login-card .btn{font-size:22px;padding:16}
+.login-card .btn-secondary{background:#3a3a3c;color:#fff;margin-top:8px}
+.route-strip{display:flex;overflow-x:auto;gap:14px;padding:16px 10px;border-top:2px solid #555;margin-top:12px;background:rgba(255,255,0.05);border-radius:12px;min-height:80px;scroll-behavior:smooth;align-items:center}
+.dot-node{flex:0 0 180px;text-align:center;font-size:18px;transition:all .3s;white-space:nowrap;overflow:visible;flex-shrink:0;padding:4px 0}
+.dot{width:32px;height:32px;border-radius:50%;background:#444;margin:0 auto 6px;border:3px solid #666;transition:all .3s}
+.dot-node.current .dot{background:#00ff66;box-shadow:0 0 24px #00ff66;border-color:#fff;transform:scale(1.15)}
+.dot-node.current span{color:#fff;font-weight:800;font-size:20px}
+.dot-node.next .dot{background:#00ff66;animation:blink .8s infinite;border-color:#fff}
+.dot-node.next span{color:#00ff66;font-weight:700}
+.dot-node.passed .dot{background:#666;border-color:#888;opacity:.5}
+.dot-node.passed span{color:#888}
+@keyframes blink{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.9)}}
+.play-a{background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:15}
+.walkie-talkie{background:#2c1a3a;border:2px solid var(--gold);border-radius:16px;padding:16px;margin-top:8px}
+.walkie-talkie .record-btn{width:72px;height:72px;font-size:36px}
+.admin-tabs{display:flex;gap:8px;flex-wrap-wrap;margin-bottom:10}
+.admin-tab{flex:1;min-width:70px;padding:12px 8px;background:#2c2c2e;border:none;color:#888;border-radius:12px;cursor:pointer;font-size:16px;font-weight:700;transition:.3s}
+.admin-tab.active{background:var(--gold);color:#000}
+.admin-section{display:none}
+.admin-section.active{display:block}
+.admin-stat-grid{display:grid;grid-template-columns:1fr 1fr 1fr;gap:8px;margin-bottom:12px}
+.admin-stat-card{background:#2c2c2e;border-radius:12px;padding:12px;text-align:center}
+.admin-stat-card .label{font-size:14px;color:#888}
+.admin-stat-card .value{font-size:28px;font-weight:800;color:var(--gold)}
+.admin-item{background:#2c2c2e;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--blue)}
+.admin-item .title{font-size:18px;font-weight:700;color:var(--gold)}
+.admin-item .info{font-size:15px;color:#ccc}
+.admin-input{flex:1;padding:14px;border-radius:10px;border:none;font-size:18px;background:#2c2c2e;color:#fff;min-width:60px}
+.floating-announce{position:fixed;bottom:80px;right:16px;width:60px;height:60;border-radius:50%;background:var(--green);border:none;color:#fff;font-size:28px;cursor:pointer;z-index:15;box-shadow:0 4px 14px rgba(0,0,0,.4)}
+.floating-announce.has-new{background:var(--orange);animation:pulse-orange 1s infinite}
+@keyframes pulse-orange{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
+.announce-bell{position:fixed;top:10px;right:68px;z-index:30;background:#333;color:#fff;border:none;border-radius:50%;width:44px;height:44px;font-size:22px;display:none;align-items:center;justify-content:center;cursor:pointer}
+.announce-bell.has-announce{display:flex;background:#fc0;color:#000}
+.announce-bell .dot-badge{position:absolute;top:-2px;right:-2px;background:red;border-radius:50%;width:12px;height:12px}
+.announce-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:30;display:none;flex-direction:column;padding:16px}
+.announce-overlay.show{display:flex}
+.announce-list{flex:1;overflow-y:auto;background:#1a1a1a;border-radius:14px;padding:12px;margin-top:12px}
+.announce-item{background:#2c2c2e;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--gold)}
+.announce-item .time{font-size:12px;color:#888}
+.announce-item .text{font-size:16}
+.announce-modal{position:fixed;top:0;left:100%;height:100%;background:rgba(0,0,.85);z-index:40;display:none;align-items:center;justify-content:center;padding:20}
+.announce-modal.active{display:flex}
+.announce-modal .modal-card{background:#2c1a3a;border:2px solid var(--gold);border-radius:20px;padding:24px;max-width:400px;width:100%;text-align:center}
+.announce-modal .modal-text{font-size:22px;color:#fff;margin-bottom:12}
+.announce-modal .close-btn{background:var(--gold);color:#000;border:none;padding:12px 24px;border-radius:12px;font-size:20px;font-weight:700;cursor:pointer}
+.msg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:20;display:none;flex-direction:column;padding:16}
+.msg-overlay.show{display:flex}
+.donate-card{background:#2c1a3a;border:2px solid var(--gold);border-radius:16px;padding:16;text-align:center;margin-top:8}
+.donate-card .fps-code{background:#000;padding:12;border-radius:12;display:inline-block;font-size:20;color:var(--gold);cursor:pointer}
+#voice-toggle{font-size:28!important;padding:20!important;min-height:80}
+.collapsible-list .list-container{max-height:400;overflow-y:auto}
+.collapsible-list .list-container.expanded{max-height:none}
+.toggle-btn{background:var(--blue);color:#fff;border:none;padding:8px 16;border-radius:8;cursor:pointer;font-size:14;margin-bottom:8}
+.toggle-btn:active{opacity:.7}
+.wake-lock-status{position:fixed;bottom:20;left:16;font-size:14;color:#888;z-index:10;background:rgba(0,0,0,.7);padding:6px 14;border-radius:12;border:1px solid #333}
+.wake-lock-status.active{color:var(--green);border-color:var(--green)}
+.admin-online-list{max-height:200;overflow-y:auto;background:#1a1a1a;border-radius:10;padding:8;margin:8 0}
+.admin-online-item{display:flex;justify-content:space-between;align-items:center;padding:8 12;border-bottom:1px solid #333;cursor:pointer;border-radius:6;transition:.2s}
+.admin-online-item:hover{background:#2a2a2a}
+.admin-online-item .name{color:#fff;font-weight:600}
+.admin-online-item .info{color:#888;font-size:13}
+.admin-online-item .action-btn{background:var(--red);border:none;color:#fff;padding:4px 14;border-radius:6;cursor:pointer;font-size:13;font-weight:600}
+.admin-online-item .action-btn:hover{opacity:.8}
+.admin-online-item .ban{background:var(--orange);color:#000}
+.admin-online-item .kick{background:var(--red)}
+.msg-time{color:#888;font-size:12;margin-right:6;flex-shrink:0}
+.connection-status{position:fixed;top:60;left:50%;transform:translateX(-50%);padding:6px 20;border-radius:20;font-size:14;z-index:100;display:none}
+.connection-status.off{background:var(--red);color:#fff;display:block}
+.connection-status.on{background:var(--green);color:#fff;display:block}
+.admin-role-badge{background:#ff9f0a;color:#000;padding:4px 12;border-radius:12;font-size:14;font-weight:bold;display:inline-block;margin-left:8}
+/* 新增搜尋框樣式 */
+.search-input{width:100%;padding:12px;border-radius:12px;border:none;background:#2c2c2e;color:#fff;font-size:16;margin-bottom:10}
+/* 未讀標記 */
+.unread{border-left:4px var(--orange) !important}
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="title">西鐵小巴 - 優化版</div>
+    <div class="dev-tag">開發者-大輝</div>
+    <button class="global-voice-toggle" id="globalVoiceBtn">🔊</button>
+</div>
+<div class="connection-status" id="connStatus"></div>
+<button class="floating-announce" id="floatAnnounceBtn">📢</button>
+<button class="announce-bell" id="annBell">🔔<span class="dot-badge"></span></button>
+
+<div class="announce-overlay" id="annOverlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:24px;font-weight:bold;">📢 系統公告</span>
+        <button class="btn btn-sm btn-secondary" id="closeAnnOverlay">✕ 關閉</button>
+    </div>
+    <div class="announce-list" id="annList"></div>
+</div>
+<div class="announce-modal" id="annModal">
+    <div class="modal-card">
+        <div class="modal-text" id="annModalText"></div>
+        <button class="close-btn" id="annModalClose">關閉</button>
+    </div>
+</div>
+
+<div class="login-modal" id="loginModal">
+  <div class="login-card">
+    <h2 style="color:var(--gold);margin-bottom:16px;font-size:28px;">🔐 登入</h2>
+    <div id="loginChoice">
+      <button class="btn btn-google" id="loginGoogle">🅶 管理員Google登入</button>
+      <button class="btn btn-driver" id="loginDriver">🚏 司機登入</button>
+      <button class="btn btn-portal" id="loginPassenger">🧍 乘客登入</button>
+    </div>
+    <div id="driverLoginForm" style="display:none;">
+      <input type="text" id="driverId" placeholder="電郵/電話">
+      <button class="btn btn-green" id="driverLoginBtn">確認登入</button>
+      <button class="btn btn-secondary" id="driverBack">返回</button>
+      <div id="driverErr" style="color:var(--red);margin-top:8"></div>
+    </div>
+    <div id="passLoginForm" style="display:none;">
+      <input type="tel" id="passPhone" placeholder="8位電話">
+      <button class="btn btn-portal" id="passLoginBtn">確認登入</button>
+      <button class="btn btn-secondary" id="passBack">返回</button>
+      <div id="passErr" style="color:var(--red);margin-top:8"></div>
+    </div>
+    <button class="btn btn-secondary" id="loginCancel">取消</button>
+  </div>
+</div>
+
+<!-- 大堂頁 -->
+<div id="viewLobby" class="view active">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:22px;font-weight:bold;color:var(--gold);">📋 使用說明</span>
+            <button class="btn btn-sm" style="background:var(--gold);color:#000" id="guideVoiceBtn">🔊 聆聽教學</button>
+        </div>
+        <div style="margin-top:10;color:#ccc;line-height:1.8;font-size:17;">
+            🚏 司機：登入→輸入車牌→開始當值→GPS自動報站<br>
+            🧍 乘客：登入→揀車追蹤→開啟語音報站<br>
+            🎙️ 對講：司機/管理員即時語音文字通訊
+        </div>
+    </div>
+    <button class="btn btn-portal" id="btnPassenger">🧍 乘客入口</button>
+    <button class="btn btn-driver" id="btnDriver">🚏 司機入口</button>
+    <button class="btn btn-warn" id="btnQr">📱 分享二維碼</button>
+    <button class="btn btn-purple" id="btnAdmin" style="display:none;">👑 總管後台</button>
+    <button class="btn btn-secondary" id="btnLogout">🚪 登出</button>
+    <div class="donate-card">
+        <div style="color:var(--gold);font-size:20px;font-weight:bold;margin-bottom:8;">支持開發者</div>
+        <div class="fps-code" id="fpsText">轉數快：122891914</div>
+        <div style="color:#aaa;font-size:14;margin-top:6;">點擊複製</div>
+    </div>
+    <div id="qrBox" class="card" style="display:none;"></div>
+</div>
+
+<!-- 乘客車列表 -->
+<div id="viewPassList" class="view">
+    <h2 style="text-align:center;font-size:24px;">🚐 在線小巴</h2>
+    <div class="row">
+        <button class="btn btn-sm btn-secondary" id="refreshBus">🔄 重新整理</button>
+    </div>
+    <div id="busList"></div>
+    <button class="btn btn-secondary" id="backLobbyList">返回大堂</button>
+</div>
+
+<!-- 追蹤車頁 -->
+<div id="viewPassTrack" class="view">
+    <button id="voiceToggle" class="btn" style="background:#ff9f0a;color:#000;min-height:80;">🔊 廣東話報站</button>
+    <div class="card" id="passInfoCard">載入中</div>
+    <div class="route-strip" id="passRouteStrip"></div>
+    <div class="msg-area">
+        <div class="msg-list" id="passMsgList"></div>
+        <div class="msg-row">
+            <button class="record-btn" id="passRec">🎤<span class="recTimer" id="passTimer" style="position:absolute;top:-6;right:-6;background:red;color:#fff;padding:2px 6;font-size:12;display:none;">0s</span></button>
+            <input class="msg-input" id="passMsgInput" placeholder="輸入訊息">
+            <button class="send-btn" id="passSend">發</button>
+        </div>
+        <div class="row">
+            <button class="btn btn-sm btn-secondary" id="passHideMsg">隱藏訊息</button>
+            <button class="btn btn-sm btn-secondary" id="passShowMsg" style="display:none;">還原訊息</button>
+        </div>
+    </div>
+    <button class="btn btn-secondary" id="backBusList">返回車列表</button>
+</div>
+
+<!-- 司機頁 -->
+<div id="viewDriver" class="view">
+    <div id="driverPanel" style="display:flex;flex-direction:column;gap:10;">
+        <div class="card" style="text-align:center;padding:14;">
+            <div id="driverInfo" style="font-size:18;color:#aaa;">🚐 未登入</div>
+            <div style="margin:8px 0;">
+                <span class="badge badge-purple" id="modeBadge">西鐵快線</span>
+                <span class="badge badge-red" id="dirBadge">往元朗</span>
+            </div>
+            <div class="station-name" id="curStation">大棠黃泥墩</div>
+            <div id="nextStation" style="font-size:20;color:var(--gold);">下一站：-</div>
+            <div id="gpsTip" style="font-size:16;color:#888;">未開啟當值</div>
+        </div>
+        <div class="card" style="text-align:center;padding:12;">
+            <div style="font-size:20;color:#aaa;">目前乘客</div>
+            <div class="big-number" id="passCount">0</div>
+            <div class="row">
+                <button class="btn btn-green" id="addPass">＋乘客</button>
+                <button class="btn btn-red" id="subPass">－乘客</button>
+            </div>
+        </div>
+        <div class="row">
+            <button class="btn btn-portal" id="prevStation">◀ 上一站</button>
+            <button class="btn btn-portal" id="nextStation">下一站 ▶</button>
+        </div>
+        <div class="row">
+            <button class="btn" id="fullBtn" style="background:var(--green);">🚫 未滿座</button>
+            <button class="btn btn-secondary" id="seatBtn">16座</button>
+        </div>
+        <div class="row">
+            <button class="btn btn-sm btn-secondary" id="switchDir">調頭</button>
+            <button class="btn btn-sm btn-purple" id="switchRoute">切換循環線</button>
+        </div>
+        <div class="row">
+            <input class="admin-input" id="plateInput" placeholder="輸入車牌">
+            <button class="btn btn-sm btn-green" id="savePlate">儲存車牌</button>
+        </div>
+        <button class="btn btn-green" id="startDuty">🟢 開啟GPS當值</button>
+        <button class="btn btn-red" id="stopDuty" style="display:none;">🔴 停止當值</button>
+        <div class="route-strip" id="driverRouteStrip"></div>
+        <!-- 司機對講 -->
+        <div class="walkie-talkie">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8;">
+                <span style="font-size:20;font-weight:bold;color:var(--gold);">🎙️ 司機對講</span>
+                <span id="walkTargetTxt">廣播：全部司機</span>
+            </div>
+            <div class="row">
+                <select id="walkTarget" class="admin-input">
+                    <option value="all">全部司機</option>
+                </select>
+                <button class="btn btn-sm btn-secondary" id="refreshWalk">刷新</button>
+            </div>
+            <div style="display:flex;gap:12;align-items:center;">
+                <button class="record-btn" id="walkRec">🎤<span class="recTimer" id="walkTimer" style="position:absolute;top:-8;right:-8;background:red;color:#fff;padding:2px 8;font-size:12;display:none;">0s</span></button>
+                <div style="flex:1;font-size:16;color:#888;">長按錄音，放開發送</div>
+            </div>
+            <div id="walkMsgBox" style="max-height:120;overflow-y:auto;background:#1a1a1a;border-radius:10;padding:8;margin-top:8;"></div>
+        </div>
+        <!-- 乘客訊息 -->
+        <div class="msg-area">
+            <div class="msg-list" id="driverMsgList"></div>
+            <div class="msg-row">
+                <button class="record-btn" id="driverRec">🎤<span class="recTimer" id="driverTimer" style="position:absolute;top:-6;right:-6;background:red;color:#fff;padding:2px 6;font-size:12;display:none;">0s</span></button>
+                <input class="msg-input" id="driverMsgInput" placeholder="廣播訊息">
+                <button class="send-btn" id="driverSend">發</button>
+            </div>
+            <div class="row">
+                <button class="btn btn-sm btn-secondary" id="driverHideMsg">隱藏訊息</button>
+                <button class="btn btn-sm btn-secondary" id="driverShowMsg" style="display:none;">還原訊息</button>
+            </div>
+        </div>
+    </div>
+    <button class="btn btn-secondary" id="backLobbyDriver">返回大堂</button>
+</div>
+
+<!-- 管理後台 -->
+<div id="viewAdmin" class="view">
+    <div class="card" style="border:2px solid var(--gold);background:#1a0a2e;">
+        <h2 style="text-align:center;color:var(--gold);font-size:26;">總管後台 <span id="adminRoleBadge" class="admin-role-badge" style="display:none;">普通管理員</span></h2>
+        <div class="admin-stat-grid">
+            <div class="admin-stat-card"><div class="label">在線車</div><div class="value" id="statBus">0</div></div>
+            <div class="admin-stat-card"><div class="label">乘客數</div><div class="value" id="statPass">0</div></div>
+            <div class="admin-stat-card"><div class="label">訊息總數</div><div class="value" id="statMsg">0</div></div>
+        </div>
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-tab="monitor">監控</button>
+            <button class="admin-tab" data-tab="device">設備紀錄</button>
+            <button class="admin-tab" data-tab="walk">管理對講</button>
+            <button class="admin-tab" data-tab="ban">封鎖管理</button>
+            <button class="admin-tab" data-tab="kick">踢出用家</button>
+            <button class="admin-tab" data-tab="ann">公告</button>
+            <button class="admin-tab" data-tab="broad">全域廣播</button>
+            <button class="admin-tab" data-tab="super" id="tabSuper" style="display:none;">管理員賬號</button>
+        </div>
+
+        <!-- 監控頁 -->
+        <div class="admin-section active" id="sec-monitor">
+            <input class="search-input" id="msgSearch" placeholder="搜車牌/手機號">
+            <div class="row">
+                <button class="btn btn-sm btn-red" id="clearAllMsg">清空全部訊息</button>
+                <button class="btn btn-sm btn-secondary" id="restoreAllMsg">還原隱藏</button>
+            </div>
+            <div class="collapsible-list">
+                <button class="toggle-btn" id="msgToggle">顯示全部</button>
+                <div class="list-container" id="adminMsgList"></div>
+            </div>
+        </div>
+
+        <!-- 設備紀錄 -->
+        <div class="admin-section" id="sec-device">
+            <input class="search-input" id="devSearch" placeholder="搜手機/IP">
+            <div class="collapsible-list">
+                <button class="toggle-btn" id="devToggle">顯示全部</button>
+                <div class="list-container" id="devList"></div>
+            </div>
+        </div>
+
+        <!-- 管理對講 -->
+        <div class="admin-section" id="sec-walk">
+            <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8;">
+                <span style="font-size:18;font-weight:700;color:var(--purple);">管理員專用對講</span>
+                <button class="btn btn-sm btn-red" id="clearWalk">清空對講</button>
+            </div>
+            <div class="row">
+                <select id="adminWalkTarget" class="admin-input">
+                    <option value="all">全部司機</option>
+                </select>
+                <button class="btn btn-sm btn-secondary" id="refreshAdminWalk">刷新</button>
+            </div>
+            <div style="display:flex;gap:12;align-items:center;">
+                <button class="record-btn" id="adminWalkRec">🎤<span class="recTimer" id="adminWalkTimer" style="position:absolute;top:-8;right:-8;background:red;color:#fff;padding:2px 8;font-size:12;display:none;">0s</span></button>
+                <div style="flex:1;font-size:16;color:#888;">長按錄音發送</div>
+            </div>
+            <div id="adminWalkBox" style="max-height:300;overflow-y:auto;background:#1a1a1a;border-radius:10;padding:8;margin-top:8;"></div>
+        </div>
+
+        <!-- 封鎖 -->
+        <div class="admin-section" id="sec-ban">
+            <span style="font-size:16;font-weight:bold;color:#aaa;">在線司機（點擊封鎖）</span>
+            <div class="admin-online-list" id="banDriverList"></div>
+            <span style="font-size:16;font-weight:bold;color:#aaa;margin-top:12;display:block;">在線乘客（點擊封鎖）</span>
+            <div class="admin-online-list" id="banPassList"></div>
+            <div style="margin-top:16;border-top:1px solid #555;padding-top:14;">
+                <span style="font-size:16;font-weight:bold;">新增司機賬號</span>
+                <div class="row" style="margin-top:6;">
+                    <input class="admin-input" id="addDriverInput" placeholder="電郵/電話">
+                    <button class="btn btn-sm btn-green" id="addDriverBtn">新增</button>
+                </div>
+                <div id="addDriverTip" style="color:#aaa;font-size:14;margin-top:4;"></div>
+            </div>
+            <div style="margin-top:12;">
+                <span style="font-size:16;color:#aaa;">已封鎖清單</span>
+                <div id="banListBox"></div>
+            </div>
+        </div>
+
+        <!-- 踢出 -->
+        <div class="admin-section" id="sec-kick">
+            <span style="font-size:16;font-weight:bold;color:#aaa;">在線車輛</span>
+            <div class="admin-online-list" id="kickBusList"></div>
+            <span style="font-size:16;font-weight:bold;color:#aaa;margin-top:12;display:block;">活躍乘客</span>
+            <div class="admin-online-list" id="kickPassList"></div>
+            <label style="display:flex;align-items:center;gap:8;font-size:16;color:#aaa;margin-top:8;">
+                <input type="checkbox" id="kickDelMsg" checked>踢出同時刪除訊息
+            </label>
+            <div id="kickTip" style="margin-top:8;color:#ccc;"></div>
+        </div>
+
+        <!-- 公告 -->
+        <div class="admin-section" id="sec-ann">
+            <div class="row">
+                <input class="admin-input" id="annText" placeholder="輸入公告內容">
+                <button class="btn btn-sm btn-portal" id="pubAnn">發佈文字公告</button>
+            </div>
+            <div class="row" style="margin-top:8;">
+                <button class="record-btn" id="annRec">🎤<span class="recTimer" id="annTimer" style="position:absolute;top:-6;right:-6;background:red;color:#fff;padding:2px 6;font-size:12;display:none;">0s</span></button>
+                <input class="admin-input" readonly placeholder="長按錄音發語音公告">
+                <button class="btn btn-sm btn-red" id="clearAllAnn">清空公告</button>
+            </div>
+            <div class="collapsible-list">
+                <button class="toggle-btn" id="annToggle">顯示全部公告</button>
+                <div class="list-container" id="annListBox"></div>
+            </div>
+            <div style="margin-top:10;border-top:1px solid #555;padding-top:10;">
+                <span style="color:#aaa;font-size:16;">定時公告（超管）</span>
+                <div class="row" style="margin-top:6;">
+                    <input class="admin-input" id="timedAnnText" placeholder="定時公告文字">
+                    <input type="datetime-local" class="admin-input" id="timedAnnTime">
+                    <button class="btn btn-sm btn-warn" id="pubTimed">排程發布</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- 全域廣播 -->
+        <div class="admin-section" id="sec-broad">
+            <div class="row">
+                <input class="admin-input" id="broadTarget" placeholder="指定車牌，留空=全部">
+                <button class="btn btn-sm btn-secondary" id="broadAll">全部車</button>
+            </div>
+            <div class="msg-row">
+                <button class="record-btn" id="broadRec">🎤<span class="recTimer" id="broadTimer" style="position:absolute;top:-6;right:-6;background:red;color:#fff;padding:2px 6;font-size:12;display:none;">0s</span></button>
+                <input class="msg-input" id="broadInput" placeholder="廣播文字">
+                <button class="send-btn" id="broadSend">發送</button>
+            </div>
+            <div id="broadTip" style="margin-top:8;color:#ccc;"></div>
+        </div>
+
+        <!-- 超管：管理員管理 -->
+        <div class="admin-section" id="sec-super">
+            <span style="font-size:18;font-weight:bold;color:var(--gold);">新增管理員Google電郵</span>
+            <div class="row" style="margin-top:8;">
+                <input class="admin-input" id="newAdminMail" placeholder="xxx@gmail.com">
+                <button class="btn btn-sm btn-purple" id="addAdminBtn">新增</button>
+            </div>
+            <div id="addAdminTip" style="color:#aaa;margin-top:6;"></div>
+            <div style="margin-top:12;">
+                <span style="font-size:16;color:#aaa;">現有管理員清單</span>
+                <div id="adminListBox" style="background:#1a1a1a;border-radius:10;padding:8;margin-top:6;"></div>
+            </div>
+        </div>
+    </div>
+    <button class="btn btn-secondary" id="backLobbyAdmin">返回大堂</button>
+</div>
+
+<div class="toast" id="toast"></div>
+<div class="wake-lock-status" id="wakeStatus">🔋 螢幕鎖：待開啟</div>
+
+<script>
+// ====================== 全域常數 & Firebase 初始化 ======================
+const firebaseConfig = {
+  apiKey: "AIzaSyCnToMYsM7pIGeGHLt5xFbQfT5RAIWzTQA",
+  authDomain: "van-v9-41439.firebaseapp.com",
+  databaseURL: "https://van-v9-41439-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "van-v9-41439",
+  storageBucket: "van-v9-41439.firebasestorage.app",
+  messagingSenderId: "434506286219",
+  appId: "1:434506286219:web:00a57d319da5c6cc4fc08e"
+};
+firebase.initializeApp(firebaseConfig);
+const auth = firebase.auth();
+const db = firebase.database();
+const SUPER_ADMINS = ['cheungyiufai1810@gmail.com','hujiaboy@gmail.com'];
+// 全域狀態
+let currentUser = {uid:null,identifier:null,role:'passenger',loginTime:null};
+let isSuperAdmin = false,isAdmin = false;
+let voiceEnabled = localStorage.getItem('globalVoice') !== 'off';
+let voiceLock = false; // 語音互斥鎖優化
+let wakeLock = null,wakeInterval = null;
+let gpsWatchId = null,gpsLastStation = -1,gpsCoolDown = 0;
+let driverData = {plate:'',mode:'busy',dir:0,stationIdx:0,pass:0,seats:16,full:false,active:false};
+let currentTrackBus = null;
+// 監聽器存儲，用於切頁銷毀
+let listeners = {
+  busList:null,passMsg:null,driverMsg:null,walkie:null,adminWalk:null,activeBus:null,route:null
+};
+// 離線緩存物件
+let localCache = JSON.parse(localStorage.getItem('vanCache')||'{}');
+// 加密簡單工具（Base64加簡單位移，滿足訊息不裸存）
+const ENC_SHIFT = 13;
+function encryptStr(s){
+  return btoa([...s].map(c=>String.fromCharCode(c.charCodeAt()+ENC_SHIFT)).join(''));
+}
+function decryptStr(s){
+  try{
+    return [...atob(s)].map(c=>String.fromCharCode(c.charCodeAt()-ENC_SHIFT)).join('');
+  }catch{return s;}
+}
+// ====================== 通用工具函數（封裝消除重複） ======================
+// 1 頁面切換 + 銷毀監聽
+function showView(id){
+  document.querySelectorAll('.view').forEach(v=>v.classList.remove('active'));
+  document.getElementById(id).classList.add('active');
+  // 銷毀當前頁多餘監聽
+  Object.values(listeners).forEach(l=>{if(l)l.off()});
+}
+// 2 Toast提示
+function showToast(msg){
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  clearTimeout(t._t);
+  t._t = setTimeout(()=>t.classList.remove('show'),3000);
+}
+// 3 廣東話語音合成（加互斥鎖優化）
+async function speakHK(text){
+  if(!voiceEnabled||voiceLock||!window.speechSynthesis) return;
+  voiceLock = true;
+  window.speechSynthesis.cancel();
+  const u = new SpeechSynthesisUtterance(text);
+  u.lang = 'zh-HK';u.rate = 0.9;u.volume = 1;
+  const vs = window.speechSynthesis.getVoices().find(v=>v.lang==='zh-HK');
+  if(vs)u.voice = vs;
+  await new Promise(r=>{u.onend=r;window.speechSynthesis.speak(u);});
+  voiceLock = false;
+}
+// 4 距離計算GPS
+function getDistance(lat1,lon1,lat2,lon2){
+  const R = 6371000;
+  const dLat = (lat2-lat1)*Math.PI/180;
+  const dLon = (lon2-lon2)*Math.PI/180;
+  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLon/2);
+  return R * 2 * Math.atan2(Math.sqrt(a),Math.sqrt(1-a));
+}
+// 5 錄音壓縮封裝（64kbps）
+function setupRec(btnId,timerId,callback){
+  const btn = document.getElementById(btnId);
+  const timer = document.getElementById(timer);
+  let recStart = null,recStream=null,recObj=null,recBuf=[],sec=0,timerInt;
+  function endRec(){
+    clearTimeout(recStart);clearInterval(timerInt);
+    if(recObj&&recObj.state==='recording') recObj.stop();
+    if(recStream) recStream.getTracks().forEach(t=>t.stop());
+    recStream = recObj = null;
+    btn.classList.remove('recording');
+    if(timer){timer.style.display='none';timer.textContent='0s';}
+    sec=0;
+  }
+  btn.addEventListener('mousedown',e=>{
+    e.preventDefault();
+    recStart = setTimeout(async()=>{
+      try{
+        recStream = await navigator.mediaDevices.getUserMedia({audio:true});
+        recObj = new MediaRecorder(recStream,{audioBitsPerSecond:64000});
+        recBuf=[];
+        recObj.ondataavailable=e=>recBuf.push(e.data);
+        recObj.onstop=()=>{
+          const blob = new Blob(recBuf,{type:'audio/webm'});
+          const fr = new FileReader();
+          fr.onload=()=>{
+            const base = fr.result.split(',')[1];
+            callback(base);showToast('錄音完成');
+          };
+          fr.readAsDataURL(blob);
+        };
+        recObj.start();
+        btn.classList.add('recording');
+        if(timer){timer.style.display='block';timer.textContent='0s';}
+        timerInt = setInterval(()=>{sec++;if(timer)timer.textContent=sec+'s';},1000);
+      }catch{showToast('無法取用咪高峰');endRec();}
+    },500);
+  });
+  ['mouseup','mouseleave','touchend','touchcancel'].forEach(ev=>{
+    btn.addEventListener(ev,end,{passive:false});
+  });
+  function end(e){e.preventDefault();endRec();}
+}
+// 6 螢幕常亮備用機制
+async function enableWake(){
+  try{
+    if('wakeLock' in navigator){
+      wakeLock = await navigator.wakeLock.request('screen');
+      wakeLock.addEventListener('release',()=>{
+        wakeLock=null;document.getElementById('wakeStatus').text='🔋 螢幕鎖已釋放';
+      });
+      document.getElementById('wakeStatus').text='🔋 螢幕鎖已開啟 ✅';
+      document.getElementById('wakeStatus').classList.add('active');
+    }
+  }catch{
+    // 備用：定時修改DOM防止休眠
+    wakeInterval = setInterval(()=>{
+      document.body.style.opacity = (Math.random()*0.001)+1;
+    },300);
+    document.getElementById('wakeStatus').text='🔋 設備不支援原生鎖，啟用備用';
+    document.getElementById('wakeStatus').classList.add('active');
+  }
+}
+function disableWake(){
+  if(wakeLock) wakeLock.release().catch(()=>{});
+  wakeLock=null;clearInterval(wakeInterval);
+  document.getElementById('wakeStatus').text='🔋 螢幕鎖：關閉';
+  document.getElementById('wakeStatus').classList.remove('active');
+}
+// 7 操作日誌寫入
+function writeLog(action,target){
+  if(!currentUser.identifier) return;
+  db.ref('operationLogs').push({
+    operator:currentUser.identifier,
+    action,target,time:Date()
+  });
+}
+// 8 儲存本地緩存
+function saveCache(){
+  localStorage.setItem('vanCache',JSON.stringify(localCache));
+}
+// ====================== Firebase動態路線載入 ======================
+let routeData = {busyGo:[],busyBack:[],normalGo:[],normalBack:[],busyGoCoords:[],busyBackCoords:[],normalGoCoords:[],normalBackCoords:[]};
+function loadRouteData(){
+  listeners.route = db.ref('routeData').on('value',snap=>{
+    const d = snap.val()||{};
+    routeData = {
+      busyGo:d.busyGo||[],
+      busyBack:d.busyBack||[],
+      normalGo:d.normalGo||[],
+      normalBack:d.normalBack||[],
+      busyGoCoords:d.busyGoCoords||[],
+      busyBackCoords:d.busyBackCoords||[],
+      normalGoCoords:d.normalGoCoords||[],
+      normalBackCoords:[]
+    };
+    localCache.route = routeData;saveCache();
+    renderDriverRoute();
+  });
+}
+function getNowRoute(){
+  const m = driverData.mode;
+  const dir = driverData.dir;
+  if(m==='busy') return dir===0 ? routeData.busyGo : routeData.busyBack;
+  return dir===0 ? routeData.normalGo : routeData.normalBack;
+}
+function getNowCoords(){
+  const m = driverData.mode;
+  const dir = driverData.dir;
+  if(m==='busy') return dir===0 ? routeData.busyGoCoords : routeData.busyBackCoords;
+  return dir===0 ? routeData.normalGoCoords : routeData.normalBackCoords;
+}
+// ====================== GPS優化邏輯（節流+冷卻） ======================
+function startGPS(){
+  if(!driverData.plate){showToast('請先輸入車牌');return;}
+  if(gpsWatchId){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
+  enableWake();
+  driverData.active = true;
+  gpsLastStation = -1;gpsCoolDown = Date.now();
+  gpsWatchId = navigator.geolocation.watchPosition(pos=>{
+    const now = Date.now();
+    // 到站冷卻3秒內不重複判斷
+    if(now - gpsCoolDown < 3000) return;
+    const coords = getNowCoords();
+    const route = getNowRoute();
+    let minD = Infinity,minIdx=0;
+    coords.forEach((c,i)=>{
+      const d = getDistance(pos.coords.latitude,pos.coords.longitude,c.lat,c.lng);
+      if(d<minD){minD=d;minIdx=i;}
+    });
+    // 100米內視為到站，且未經過
+    if(minD<100 && minIdx>gpsLastStation){
+      gpsLastStation = minIdx;
+      gpsCoolDown = now;
+      driverData.stationIdx = minIdx;
+      updateDriverDB();
+      renderDriverRoute();
+      speakHK('即將到達'+route[minIdx]);
+      const next = minIdx+1;
+      if(next<route.length) setTimeout(()=>speakHK('下一站'+route[next]),2000);
+      else setTimeout(()=>speakHK('已到總站，即將調頭'),2000);
+      // 抵達尾站自動調頭
+      if(minIdx === route.length-1){
+        setTimeout(()=>{
+          driverData.dir = driver.dir===0?1:0;
+          driverData.stationIdx=0;driverData.pass=0;driverData.full=false;
+          gpsLastStation=-1;gpsCoolDown=Date.now();
+          updateDriverDB();renderDriverRoute();
+          showToast('已自動調頭，清空乘客');
+          speakHK('已調頭，下一站'+getNowRoute()[0]);
+        },3000);
+      }
+    }
+    document.getElementById('gpsTip').text=`📍 ${pos.coords.latitude.toFixed(6)},${pos.coords.longitude} 距站${Math.round(minD)}m`;
+  },err=>{
+    document.getElementById('gpsTip')='📍 GPS定位失敗，檢查權限';
+    if(err.code===3) setTimeout(startGPS,3000);
+  },{enableHighAccuracy:true,timeout:15000,maximumAge:2000});
+  updateDriverDB();
+  document.getElementById('startDuty').style.display='none';
+  document.getElementById('stopDuty').style.display='block';
+  showToast('已開啟當值');speakHK('開始當值');
+}
+function stopGPS(){
+  if(!confirm('確定停止當值？車輛會離線')) return;
+  if(gpsWatchId){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;}
+  disableWake();
+  driverData.active = false;
+  if(driverData.plate) db.ref('van/activeBuses/'+driverData.plate).remove();
+  driverData.plate='';driverData.stationIdx=0;driverData.pass=0;driverData.full=false;
+  gpsLastStation=-1;
+  updateDriverUI();
+  document.getElementById('startDuty').style.display='block';
+  document.getElementById('stopDuty').style.display='none';
+  showToast('已停止當值');speakHK('停止當值');
+}
+// 更新車輛雲數據
+function updateDriverDB(){
+  const route = getNowRoute();
+  const cur = route[driverData.stationIdx]||'';
+  const nextIdx = driverData.stationIdx+1 < route.length ? driverData.stationIdx+1 : 0;
+  const next = route[nextIdx]||'總站';
+  const data = {
+    plate:driverData.plate,mode:driverData.mode,direction:driverData.dir,
+    stationIndex:driverData.stationIdx,currentStation:cur,nextStation:next,
+    passengerCount:driverData.p,carSeats:driverData.seats,isFull:driverData.full,
+    isActive:driverData.active,driverId:currentUser.identifier,updateTime:Date()
+  };
+  if(driverData.plate) db.ref('van/activeBuses/'+driverData.plate).set(data);
+  localCache.lastPlate = driverData.plate;saveCache();
+  updateDriverUI();
+}
+// 渲染路線條（共用函數，消除重複）
+function renderRoute(containerId,stationIdx){
+  const box = document.getElementById(containerId);
+  const route = getNowRoute();
+  box.innerHTML='';
+  route.forEach((name,i)=>{
+    const d = document.createElement('div');
+    d.className='dot-node';
+    if(i<stationIdx) d.classList.add('passed');
+    else if(i===stationIdx) d.classList.add('current');
+    else if(i===stationIdx+1) d.classList.add('next');
+    d.innerHTML=`<div class="dot"></div><span>${name}</span>`;
+    box.appendChild(d);
+  });
+  const cur = box.querySelector('.current');
+  if(cur) cur.scrollIntoView({behavior:'smooth',inline:'center'});
+}
+function renderDriverRoute(){render('driverRouteStrip',driverData.stationIdx);}
+// 更新司機介面文字
+function updateDriverUI(){
+  const route = getNowRoute();
+  const curS = route[driverData.stationIdx]||'-';
+  const nextI = driverData.stationIdx+1 < route.length ? driverData.stationIdx+1 : 0;
+  const nextS = route[nextI]||'總站';
+  document.getElementById('driverInfo').text=`🚐 ${driverData.plate||'未設定'} | ${currentUser.identifier||''}`;
+  document.getElementById('curStation').text=curS;
+  document.getElementById('nextStation').text='下一站：'+nextS;
+  document.getElementById('passCount').text=driverData.pass;
+  document.getElementById('modeBadge').text=driverData.mode==='busy'?'西鐵快線':'市中心循環';
+  document.getElementById('dirBadge').text=driverData.dir===0?'往元朗':'往大棠';
+  document.getElementById('seatBtn').text=driverData.seats+'座';
+  const fullBtn = document.getElementById('fullBtn');
+  fullBtn.textContent = driverData.full ? '✅ 滿座' : '🚫 未滿座';
+  fullBtn.style.background = driverData.full ? 'var(--red)' : 'var(--green)';
+  const modeBtn = document.getElementById('switchRoute');
+  mode.textContent = driverData.mode==='busy'?'切換至市中心循環':'切換西鐵快線';
+}
+// ====================== 頁面載入綁定 ======================
+document.addEventListener('DOMContentLoaded',()=>{
+  // 全域語音開關
+  const voiceBtn = document.getElementById('globalVoiceBtn');
+  voiceBtn.textContent = voiceEnabled ? '🔊' : '🔇';
+  if(!voiceEnabled) voiceBtn.classList.add('muted');
+  voiceBtn.onclick = ()=>{
+    voiceEnabled = !voiceEnabled;
+    localStorage.setItem('globalVoice',voiceEnabled?'on':'off');
+    voiceBtn.textContent = voiceEnabled ? '🔊' : '🔇';
+    voiceBtn.classList.toggle('muted');
+    showToast(voiceEnabled?'語音開啟':'語音關閉');
+    if(!voiceEnabled) window.speechSynthesis.cancel();
+  };
+  // 複製轉數快
+  document.getElementById('fpsText').onclick = async()=>{
+    try{await navigator.clipboard.writeText('122891914');showToast('已複製');speakHK('多謝支持');}
+    catch{const i=document.createElement('input');i.value='122891914';document.body.appendChild(i);i.select();document.execCommand('copy');i.remove();showToast('已複製');}
+  };
+  // 錄音按鈕統一綁定
+  setupRec('passRec','passTimer',async(base64)=>{
+    if(!currentTrackBus) return;
+    const msg = {
+      busId:currentTrackBus,uid:currentUser.identifier,
+      audio:encryptStr(base64),time:Date(),type:'audio'
+    };
+    await db.ref('van/messages').push(msg);showToast('語音已發送');
+  });
+  setupRec('driverRec','driverTimer',async(base64)=>{
+    if(!driverData.plate) return;
+    await db.ref('van/messages').push({
+      busId:driverData.plate,uid:currentUser.identifier,audio:encryptStr(base64),time:Date()
+    });showToast('語音廣播完成');
+  });
+  setupRec('walkRec','walkTimer',async(base64)=>{
+    const target = document.getElementById('walkTarget').value;
+    await db.ref('van/walkie').push({
+      sender:driverData.plate,target,audio:encryptStr(base64),time:Date()
+    });showToast('對講語音發送');
+  });
+  setupRec('adminWalkRec','adminWalkTimer',async(base64)=>{
+    const t = document.getElementById('adminWalkTarget').value;
+    await db.ref('van/walkie').push({sender:'管理員',target:t,audio:encryptStr(base64),time:Date()});
+    showToast('管理對講已發');
+  });
+  setupRec('annRec','annTimer',async(base64)=>{
+    await db.ref('van/announcements').push({audio:encryptStr(),publisher:currentUser.identifier,time:Date()});
+    showToast('語音公告發布');
+  });
+  setupRec('broadRec','broadTimer',async(base64)=>{
+    const t = document.getElementById('broadTarget').value||'all';
+    await db.ref('van/messages').push({busId:t,uid:'管理員',audio:encryptStr(base64),time:Date()});
+    showToast('全域語音廣播');
+  });
+  // 頁面跳轉按鈕
+  document.getElementById('btnPassenger').onclick = ()=>{
+    if(!currentUser.identifier){document.getElementById('loginModal').classList.add('active');return;}
+    showView('viewPassList');loadBusList();
+  };
+  document.getElementById('btnDriver').onclick = ()=>{
+    if(!currentUser.identifier){document.getElementById('loginModal').classList.add('active');return;}
+    if(currentUser.role!=='driver'&&currentUser.role!=='admin'){showToast('權限不足');return;}
+    showView('viewDriver');
+    const saved = localCache.lastPlate||'';
+    if(saved){document.getElementById('plateInput').value=saved;driverData.plate=saved;}
+    loadRouteData();
+    initDriverListener();
+  };
+  document.getElementById('btnAdmin').onclick = ()=>{
+    if(!isAdmin){showToast('無權限');return;}
+    showView('viewAdmin');loadAdminData();
+  };
+  document.getElementById('btnLogout').onclick = async()=>{
+    if(!confirm('確認登出？當值會中斷')) return;
+    if(driverData.active) stopGPS();
+    await auth.signOut();
+    currentUser = {uid:null,identifier:null,role:'passenger'};
+    isAdmin=isSuperAdmin=false;
+    document.getElementById('btnAdmin').style.display='none';
+    showView('viewLobby');
+    showToast('已登出');speakHK('下次再見');
+  };
+  // GPS開關
+  document.getElementById('startDuty').onclick = startGPS;
+  document.getElementById('stopDuty').onclick = stopGPS;
+  // 車牌儲存
+  document.getElementById('savePlate').onclick = ()=>{
+    const p = document.getElementById('plateInput').value.trim().toUpperCase();
+    if(!p){showToast('請輸入車牌');return;}
+    if(driverData.active&&!confirm('更改車牌會停止當值')) return;
+    if(driverData.active) stopGPS();
+    driverData.plate = p;
+    localCache.lastPlate=p;saveCache();
+    updateDriverDB();
+    showToast('車牌已儲存');
+  };
+  // 上下站手動切換
+  document.getElementById('prevStation').onclick = async()=>{
+    voiceLock=true;
+    const r = getNowRoute();
+    if(driverData.stationIdx>0) driverData.stationIdx--;
+    else{
+      driverData.dir = driverData.dir===0?1:0;
+      driverData.stationIdx = getNowRoute().length-1;
+      gpsLastStation=-1;showToast('調頭至尾站');
+    }
+    gpsCoolDown=Date.now();
+    updateDriverDB();renderDriverRoute();
+    await speakHK('即將到達'+getNowRoute()[driverData.stationIdx]);
+    voiceLock=false;
+  };
+  document.getElementById('nextStation').onclick = async()=>{
+    voiceLock=true;
+    const r = getNowRoute();
+    if(driverData.stationIdx<r.length-1) driverData.stationIdx++;
+    else{
+      driverData.dir = driverData.dir===0?1:0;
+      driverData.stationIdx=0;driverData.pass=0;driverData.full=false;
+      gpsLastStation=-1;showToast('已調頭清客');
+    }
+    gpsCoolDown=Date.now();
+    updateDriverDB();renderDriverRoute();
+    await speakHK('即將到達'+getNowRoute()[driverData.stationIdx]);
+    voiceLock=false;
+  };
+  // 乘客加減
+  document.getElementById('addPass').onclick = ()=>{
+    if(!driverData.active){showToast('請先開啟當值');return;}
+    if(driverData.pass>=driverData.seats){showToast('已滿');return;}
+    driverData.pass++;
+    if(driverData.pass===driverData.seats) driverData.full=true;
+    updateDriverDB();
+  };
+  document.getElementById('subPass').onclick = ()=>{
+    if(driverData.pass<=0){showToast('乘客為0');return;}
+    driverData.pass--;
+    if(driverData.pass<driverData.seats) driverData.full=false;
+    updateDriverDB();
+  };
+  // 滿座切換
+  document.getElementById('fullBtn').onclick = ()=>{
+    if(!driverData.active){showToast('先開當值');return;}
+    driverData.full = !driverData.full;
+    driverData.pass = driverData.full ? driverData.seats : Math.max(0,driverData.seats-1);
+    updateDriverDB();
+  };
+  // 座數切換
+  document.getElementById('seatBtn').onclick = ()=>{
+    driverData.seats = driverData.seats===16?19:16;
+    if(driverData.pass>driverData.seats) driverData.pass=driverData.seats;
+    driverData.full = driverData.pass===driverData.seats;
+    updateDriverDB();
+  };
+  // 調頭按鈕
+  document.getElementById('switchDir').onclick = ()=>{
+    if(!driverData.active){showToast('請開啟當值');return;}
+    driverData.dir = driverData.dir===0?1:0;
+    driverData.stationIdx=0;driverData.pass=0;driverData.full=false;
+    gpsLastStation=-1;gpsCoolDown=Date.now();
+    if(gpsWatchId){navigator.geolocation.clearWatch(gpsWatchId);gpsWatchId=null;startGPS();}
+    updateDriverDB();renderDriverRoute();
+    showToast('已調頭');speakHK('調頭完畢');
+  };
+  // 路線切換
+  document.getElementById('switchRoute').onclick = ()=>{
+    if(!driverData.active){showToast('請開啟當值');return;}
+    driverData.mode = driverData.mode==='busy'?'normal':'busy';
+    driverData.stationIdx=0;gpsLastStation=-1;
+    updateDriverDB();renderDriverRoute();
+    const name = driverData.mode==='busy'?'西鐵快線':'市中心循環線';
+    showToast('切換至'+name);speakHK('已切換'+name);
+  };
+  // 自動清理7日前訊息
+  const cleanOld = ()=>{
+    const seven = Date.now() - 7*24*3600*1000;
+    db.ref('van/messages').orderByChild('time').endAt(seven).once(snap=>{
+      const u = {};snap.forEach(c=>u[c.key]=null);
+      if(Object.keys(u).length) db.ref('van/messages').update(u);
+    });
+    db.ref('van/walkie').orderByChild('time').endAt(seven).once(snap=>{
+      const u = {};snap.forEach(c=>u[c.key]=null);
+      if(Object.keys(u).length) db.ref('van/walkie').update(u);
+    });
+  };
+  setTimeout(cleanOld,5000);
+  // 閒置車輛自動清理（30分鐘無更新）
+  setInterval(()=>{
+    const thirty = Date.now() - 30*60*1000;
+    db.ref('van/activeBuses').once(snap=>{
+      snap.forEach(c=>{
+        const v = c.val();
+        if(v.updateTime && v.updateTime < thirty) c.ref.remove();
+      });
+    });
+  },60000);
+  // 網路偵測
+  db.ref('.info/connected').on('value',snap=>{
+    const stat = document.getElementById('connStatus');
+    if(snap.val()){
+      stat.textContent='🟢 已連線';stat.className
