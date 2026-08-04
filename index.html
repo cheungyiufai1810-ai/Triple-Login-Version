@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
-<title>西鐵小巴 - 優化版</title>
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚐</text></svg>">
+<title>西鐵小巴 - 優化可執行版</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🚐</text>">
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-database-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.7.1/firebase-auth-compat.js"></script>
@@ -14,7 +14,6 @@
 :root{--bg:#0f0f0f;--card:#1c1c1e;--gold:#fc0;--blue:#0a84ff;--red:#ff453a;--green:#30d158;--purple:#bf5af2;--orange:#ff9500;--radius:16}
 *{margin:0;padding:0;box-sizing:border;font-family:-apple-system,BlinkMacSystemFont,sans-serif}
 body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:column;overflow:hidden}
-/* 通用組件抽離，消除重複 */
 .header{padding:10px;text-align:center;border-bottom:1px solid #333;flex-shrink:0;position:relative}
 .title{font-size:32px;font-weight:800;color:var(--gold)}
 .dev-tag{font-size:16px;color:#aaa;cursor:pointer}
@@ -23,7 +22,6 @@ body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:co
 .view{display:none;flex:1;overflow-y:auto;padding:12px;flex-direction:column}
 .view.active{display:flex}
 .card{background:var(--card);border-radius:var(--radius);padding:16px;margin-bottom:12px;border:1px solid #333}
-/* 統一按鈕樣式 */
 .btn{width:100%;padding:18px;border-radius:16px;font-size:24px;font-weight:700;border:none;cursor:pointer;color:#fff;margin-bottom:10px;display:flex;align-items:center;justify-content:center;gap:10px}
 .btn:active{opacity:.8;transform:scale(.97)}
 .btn:disabled{opacity:.4;cursor:not-allowed;transform:none}
@@ -49,7 +47,7 @@ body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:co
 .msg-row{display:flex;gap:10px;align-items:center;padding:8px 0;border-bottom:1px solid #333;flex-wrap:wrap}
 .msg-input{flex:1;padding:14px;border-radius:12px;border:none;font-size:18px;background:#2c2c2e;color:#fff;min-width:100px}
 .record-btn,.send-btn{width:56px;height:56px;border-radius:14px;border:none;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;position:relative}
-.record-btn{background:#ff9f0a;color:#000;font-size:26}
+.record-btn{background:#ff9f0a;color:#000;font-size:26px}
 .record-btn.recording{background:red;color:#fff;animation:pulse .6s infinite}
 .send-btn{background:var(--blue);color:#fff;font-size:18px;font-weight:700}
 @keyframes pulse{0%,100%{transform:scale(1)}50%{transform:scale(1.08)}}
@@ -59,7 +57,7 @@ body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:co
 .login-modal.active{display:flex}
 .login-card{background:#1c1c1e;border:2px solid var(--gold);border-radius:20px;padding:24px;max-width:400px;width:100%;text-align:center}
 .login-card input{width:100%;padding:16px;margin:8px 0;border-radius:12px;border:none;font-size:20px;background:#2c2c2e;color:#fff}
-.login-card .btn{font-size:22px;padding:16}
+.login-card .btn{font-size:22px;padding:16px}
 .login-card .btn-secondary{background:#3a3a3c;color:#fff;margin-top:8px}
 .route-strip{display:flex;overflow-x:auto;gap:14px;padding:16px 10px;border-top:2px solid #555;margin-top:12px;background:rgba(255,255,0.05);border-radius:12px;min-height:80px;scroll-behavior:smooth;align-items:center}
 .dot-node{flex:0 0 180px;text-align:center;font-size:18px;transition:all .3s;white-space:nowrap;overflow:visible;flex-shrink:0;padding:4px 0}
@@ -74,7 +72,7 @@ body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:co
 .play-a{background:var(--blue);color:#fff;border:none;padding:6px 14px;border-radius:8px;cursor:pointer;font-size:15}
 .walkie-talkie{background:#2c1a3a;border:2px solid var(--gold);border-radius:16px;padding:16px;margin-top:8px}
 .walkie-talkie .record-btn{width:72px;height:72px;font-size:36px}
-.admin-tabs{display:flex;gap:8px;flex-wrap-wrap;margin-bottom:10}
+.admin-tabs{display:flex;gap:8px;flex-wrap:wrap;margin-bottom:10}
 .admin-tab{flex:1;min-width:70px;padding:12px 8px;background:#2c2c2e;border:none;color:#888;border-radius:12px;cursor:pointer;font-size:16px;font-weight:700;transition:.3s}
 .admin-tab.active{background:var(--gold);color:#000}
 .admin-section{display:none}
@@ -99,11 +97,208 @@ body{background:var(--bg);color:#fff;height:100vh;display:flex;flex-direction:co
 .announce-item{background:#2c2c2e;border-radius:10px;padding:12px;margin-bottom:8px;border-left:3px solid var(--gold)}
 .announce-item .time{font-size:12px;color:#888}
 .announce-item .text{font-size:16}
-.announce-modal{position:fixed;top:0;left:100%;height:100%;background:rgba(0,0,.85);z-index:40;display:none;align-items:center;justify-content:center;padding:20}
+.announce-modal{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,.85);z-index:40;display:none;align-items:center;justify-content:center;padding:20px}
 .announce-modal.active{display:flex}
 .announce-modal .modal-card{background:#2c1a3a;border:2px solid var(--gold);border-radius:20px;padding:24px;max-width:400px;width:100%;text-align:center}
-.announce-modal .modal-text{font-size:22px;color:#fff;margin-bottom:12}
+.announce-modal .modal-text{font-size:22px;color:#fff;margin-bottom:12px}
 .announce-modal .close-btn{background:var(--gold);color:#000;border:none;padding:12px 24px;border-radius:12px;font-size:20px;font-weight:700;cursor:pointer}
+.msg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:20;display:none;flex-direction:column;padding:16px}
+.msg-overlay.show{display:flex}
+.donate-card{background:#2c1a3a;border:2px solid var(--gold);border-radius:16px;padding:16;text-align:center;margin-top:8}
+.donate-card .fps-code{background:#000;padding:12;border-radius:12;display:inline-block;font-size:20;color:var(--gold);cursor:pointer}
+#voice-toggle{font-size:28px!important;padding:20px!important;min-height:80}
+.collapsible-list .list-container{max-height:400;overflow-y:auto}
+.collapsible-list .list-container.expanded{max-height:none}
+.toggle-btn{background:var(--blue);color:#fff;border:none;padding:8px 16;border-radius:8;cursor:pointer;font-size:14;margin-bottom:8}
+.toggle-btn:active{opacity:.7}
+.wake-lock-status{position:fixed;bottom:20;left:16;font-size:14;color:#888;z-index:10;background:rgba(0,0,0,.7);padding:6px 14;border-radius:12;border:1px solid #333}
+.wake-lock-status.active{color:var(--green);border-color:var(--green)}
+.admin-online-list{max-height:200;overflow-y:auto;background:#1a1a1a;border-radius:10;padding:8;margin:8 0}
+.admin-online-item{display:flex;justify-content:space-between;align-items:center;padding:8 12;border-bottom:1px solid #333;cursor:pointer;border-radius:6;transition:.2s}
+.admin-online-item:hover{background:#2a2a2a}
+.admin-online-item .name{color:#fff;font-weight:600}
+.admin-online-item .info{color:#888;font-size:13}
+.admin-online-item .action-btn{background:var(--red);border:none;color:#fff;padding:4px 14;border-radius:6;cursor:pointer;font-size:13;font-weight:600}
+.admin-online-item .action-btn:hover{opacity:.8}
+.admin-online-item .ban{background:var(--orange);color:#000}
+.admin-online-item .kick{background:var(--red)}
+.msg-time{color:#888;font-size:12;margin-right:6;flex-shrink:0}
+.connection-status{position:fixed;top:60;left:50%;transform:translateX(-50%);padding:6px 20;border-radius:20;font-size:14;z-index:100;display:none}
+.connection-status.off{background:var(--red);color:#fff;display:block}
+.connection-status.on{background:var(--green);color:#fff;display:block}
+.admin-role-badge{background:#ff9f0a;color:#000;padding:4px 12;border-radius:12;font-size:14;font-weight:bold;display:inline-block;margin-left:8}
+.search-input{width:100%;padding:12px;border-radius:12px;border:none;background:#2c2c2e;color:#fff;font-size:16;margin-bottom:10}
+.unread{border-left:4px var(--orange) !important}
+</style>
+</head>
+<body>
+<div class="header">
+    <div class="title">西鐵小巴 - 優化可執行版</div>
+    <div class="dev-tag">開發者-大輝</div>
+    <button class="global-voice-toggle" id="globalVoiceBtn">🔊</button>
+</div>
+<div class="connection-status" id="connStatus"></div>
+<button class="floating-announce" id="floatAnnounceBtn">📢</button>
+<button class="announce-bell" id="annBell">🔔<span class="dot-badge"></span></button>
+
+<div class="announce-overlay" id="annOverlay">
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;">
+        <span style="font-size:24px;font-weight:bold;">📢 系統公告</span>
+        <button class="btn btn-sm btn-secondary" id="closeAnnOverlay">✕ 關閉</button>
+    </div>
+    <div class="announce-list" id="annList"></div>
+</div>
+<div class="announce-modal" id="annModal">
+    <div class="modal-card">
+        <div class="modal-text" id="annModalText"></div>
+        <button class="close-btn" id="annModalClose">關閉</button>
+    </div>
+</div>
+
+<div class="login-modal" id="loginModal">
+  <div class="login-card">
+    <h2 style="color:var(--gold);margin-bottom:16px;font-size:28px;">🔐 登入</h2>
+    <div id="loginChoice">
+      <button class="btn btn-google" id="loginGoogle">🅶 管理員Google登入</button>
+      <button class="btn btn-driver" id="loginDriver">🚏 司機登入</button>
+      <button class="btn btn-portal" id="loginPassenger">🧍 乘客登入</button>
+    </div>
+    <div id="driverLoginForm" style="display:none;">
+      <input type="text" id="driverId" placeholder="電郵/電話">
+      <button class="btn btn-green" id="driverLoginBtn">確認登入</button>
+      <button class="btn btn-secondary" id="driverBack">返回</button>
+      <div id="driverErr" style="color:var(--red);margin-top:8"></div>
+    </div>
+    <div id="passLoginForm" style="display:none;">
+      <input type="tel" id="passPhone" placeholder="8位電話">
+      <button class="btn btn-portal" id="passLoginBtn">確認登入</button>
+      <button class="btn btn-secondary" id="passBack">返回</button>
+      <div id="passErr" style="color:var(--red);margin-top:8"></div>
+    </div>
+    <button class="btn btn-secondary" id="loginCancel">取消</button>
+  </div>
+</div>
+
+<!-- 大堂頁 -->
+<div id="viewLobby" class="view active">
+    <div class="card">
+        <div style="display:flex;justify-content:space-between;align-items:center;">
+            <span style="font-size:22px;font-weight:bold;color:var(--gold);">📋 使用說明</span>
+            <button class="btn btn-sm" id="guideVoiceBtn" style="background:var(--gold);color:#000">🔊 聆聽教學</button>
+        </div>
+        <div style="margin-top:10;color:#ccc;line-height:1.8;font-size:17;">
+            🚏 司機：登入→輸入車牌→開始當值→GPS自動報站<br>
+            🧍 乘客：登入→揀車追蹤→開啟語音報站<br>
+            🎙️ 對講：司機/管理員即時文字、語音通訊
+        </div>
+    </div>
+    <button class="btn btn-portal" id="btnPassenger">🧍 乘客入口</button>
+    <button class="btn btn-driver" id="btnDriver">🚏 司機入口</button>
+    <button class="btn btn-warn" id="btnQr">📱 分享二維碼</button>
+    <button class="btn btn-purple" id="btnAdmin" style="display:none;">👑 總管後台</button>
+    <button class="btn btn-secondary" id="btnLogout">🚪 登出</button>
+    <div class="donate-card">
+        <div style="color:var(--gold);font-size:20px;font-weight:bold;margin-bottom:8;">支持開發者</div>
+        <div class="fps-code" id="fpsText">轉數快：122891914</div>
+        <div style="color:#aaa;font-size:14;margin-top:6;">點擊複製</div>
+    </div>
+    <div id="qrBox" class="card" style="display:none;"></div>
+</div>
+
+<!-- 乘客車列表 -->
+<div id="viewPassList" class="view">
+    <h2 style="text-align:center;font-size:24px;">🚐 在線小巴</h2>
+    <div class="row">
+        <button class="btn btn-sm btn-secondary" id="refreshBus">🔄 重新整理</button>
+    </div>
+    <div id="busList"></div>
+    <button class="btn btn-secondary" id="backLobbyList">返回大堂</button>
+</div>
+
+<!-- 追蹤車頁 -->
+<div id="viewPassTrack" class="view">
+    <button id="voiceToggle" class="btn" style="background:#ff9f0a;color:#000;min-height:80;">🔊 廣東話報站</button>
+    <div class="card" id="passInfoCard">載入中</div>
+    <div class="route-strip" id="passRouteStrip"></div>
+    <div class="msg-area">
+        <div class="msg-list" id="passMsgList"></div>
+        <div class="msg-row">
+            <button class="record-btn" id="passRec">🎤<span class="recTimer" id="passTimer" style="position:absolute;top:-6;right:-6;background:red;color:#fff;padding:2px 6;font-size:12;display:none;">0s</span></button>
+            <input class="msg-input" id="passMsgInput" placeholder="輸入訊息">
+            <button class="send-btn" id="passSend">發</button>
+        </div>
+        <div class="row">
+            <button class="btn btn-sm btn-secondary" id="passHideMsg">隱藏訊息</button>
+            <button class="btn btn-sm btn-secondary" id="passShowMsg" style="display:none;">還原訊息</button>
+        </div>
+    </div>
+    <button class="btn btn-secondary" id="backBusList">返回車列表</button>
+</div>
+
+<!-- 司機頁 -->
+<div id="viewDriver" class="view">
+    <div id="driverPanel" style="display:flex;flex-direction:column;gap:10;">
+        <div class="card" style="text-align:center;padding:14;">
+            <div id="driverInfo" style="font-size:18;color:#aaa;">🚐 未登入</div>
+            <div style="margin:8px 0;">
+                <span class="badge badge-purple" id="modeBadge">西鐵快線</span>
+                <span class="badge badge-red" id="dirBadge">往元朗</span>
+            </div>
+            <div class="station-name" id="curStation">大棠黃泥墩</div>
+            <div id="nextStation" style="font-size:20;color:var(--gold);">下一站：-</div>
+            <div id="gpsTip" style="font-size:16;color:#888;">未開啟當值</div>
+        </div>
+        <div class="card" style="text-align:center;padding:12;">
+            <div style="font-size:20;color:#aaa;">目前乘客</div>
+            <div class="big-number" id="passCount">0</div>
+            <div class="row">
+                <button class="btn btn-green" id="addPass">＋乘客</button>
+                <button class="btn btn-red" id="subPass">－乘客</button>
+            </div>
+        </div>
+        <div class="row">
+            <button class="btn btn-portal" id="prevStation">◀ 上一站</button>
+            <button class="btn btn-portal" id="nextStation">下一站 ▶</button>
+        </div>
+        <div class="row">
+            <button class="btn" id="fullBtn" style="background:var(--green);">🚫 未滿座</button>
+            <button class="btn btn-secondary" id="seatBtn">16座</button>
+        </div>
+        <div class="row">
+            <button class="btn btn-sm btn-secondary" id="switchDir">調頭</button>
+            <button class="btn btn-sm btn-purple" id="switchRoute">切換循環線</button>
+        </div>
+        <div class="row">
+            <input class="admin-input" id="plateInput" placeholder="輸入車牌">
+            <button class="btn btn-sm btn-green" id="savePlate">儲存車牌</button>
+        </div>
+        <button class="btn btn-green" id="startDuty">🟢 開啟GPS當值</button>
+        <button class="btn btn-red" id="stopDuty" style="display:none;">🔴 停止當值</button>
+        <div class="route-strip" id="driverRouteStrip"></div>
+        <!-- 司機對講 -->
+        <div class="walkie-talkie">
+            <div style="display:flex;justify-content:space-between;margin-bottom:8;">
+                <span style="font-size:20;font-weight:bold;color:var(--gold);">🎙️ 司機對講</span>
+                <span id="walkTargetTxt">廣播：全部司機</span>
+            </div>
+            <div class="row">
+                <select id="walkTarget" class="admin-input">
+                    <option value="all">全部司機</option>
+                </select>
+                <button class="btn btn-sm btn-secondary" id="refreshWalk">刷新</button>
+            </div>
+            <div style="display:flex;gap:12;align-items:center;">
+                <button class="record-btn" id="walkRec">🎤<span class="recTimer" id="walkTimer" style="position:absolute;top:-8;right:-8;background:red;color:#fff;padding:2px 8;font-size:12;display:none;">0s</span></button>
+                <div style="flex:1;font-size:16;color:#888;">長按錄音，放開發送</div>
+            </div>
+            <div id="walkMsgBox" style="max-height:120;overflow-y:auto;background:#1a1a1a;border-radius:10;padding:8;margin-top:8;"></div>
+        </div>
+        <!-- 乘客訊息 -->
+        <div class="msg-area">
+            <div class="msg-list" id="driverMsgList"></div>
+            <div class="msg-row">
+                <button class="record-btn" id="driverRec">🎤<span class="recTimer" id="driverTimer" style="position:absolute;top:-6;right:-6;background:red;color:#fff;padding:2px 6;font-size:12;display:none;">0s</span></button>
+                <input class="msg-input" id="driverMsgInput" placeh.announce-modal .close-btn{background:var(--gold);color:#000;border:none;padding:12px 24px;border-radius:12px;font-size:20px;font-weight:700;cursor:pointer}
 .msg-overlay{position:fixed;top:0;left:0;width:100%;height:100%;background:rgba(0,0,0,.95);z-index:20;display:none;flex-direction:column;padding:16}
 .msg-overlay.show{display:flex}
 .donate-card{background:#2c1a3a;border:2px solid var(--gold);border-radius:16px;padding:16;text-align:center;margin-top:8}
